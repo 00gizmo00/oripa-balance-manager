@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply min-h-screen bg-background bg-grid-fade text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .page-shell {
+    @apply mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-10 pt-4 sm:px-6 lg:px-8;
+  }
+
+  .section-card {
+    @apply rounded-3xl border border-border/90 bg-card/95 shadow-soft backdrop-blur;
+  }
+}
