@@ -2,22 +2,26 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Eye, Pencil, Search, Trash2 } from "lucide-react";
+import { Eye, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 
-import { CardForm } from "@/components/forms/card-form";
 import { CardImage } from "@/components/cards/card-image";
+import { CardForm } from "@/components/forms/card-form";
 import { EmptyState } from "@/components/layout/empty-state";
 import { useAppData } from "@/components/layout/app-data-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
 
+type FormMode = "create" | "edit" | null;
+
 export function CardManager() {
   const { apps, cards, createCard, updateCard, deleteCard, createShopPrice } = useAppData();
+  const [formMode, setFormMode] = useState<FormMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "holding" | "sold">("all");
@@ -28,94 +32,198 @@ export function CardManager() {
     return cards.filter((card) => {
       const matchesQuery =
         query.length === 0 ||
-        [card.name, card.rarity, card.model_number].some((value) => value?.toLowerCase().includes(query.toLowerCase()));
+        [card.name, card.rarity, card.model_number, card.condition].some((value) =>
+          value?.toLowerCase().includes(query.toLowerCase()),
+        );
       const matchesStatus = statusFilter === "all" ? true : card.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
   }, [cards, query, statusFilter]);
 
+  const holdingCount = filteredCards.filter((card) => card.status === "holding").length;
+  const soldCount = filteredCards.length - holdingCount;
+
+  const closeDialog = () => {
+    setFormMode(null);
+    setEditingId(null);
+  };
+
   return (
     <div className="space-y-6">
-      <CardForm
-        apps={apps}
-        initialValue={editingCard}
-        onCancel={editingCard ? () => setEditingId(null) : undefined}
-        onSubmit={async (payload) => {
-          const { shop_prices, ...cardPayload } = payload;
+      <Card className="overflow-hidden">
+        <CardContent className="space-y-5 p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-slate-700">
+                <Sparkles className="size-3.5" />
+                コレクション表示
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold tracking-tight text-slate-900">カードコレクション</h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  一覧を最優先で見られるようにしつつ、追加や編集は必要なときだけ開けるようにしています。
+                </p>
+              </div>
+            </div>
 
-          if (editingCard) {
-            await updateCard(editingCard.id, cardPayload);
-            for (const shopPrice of shop_prices) {
-              await createShopPrice({
-                card_id: editingCard.id,
-                ...shopPrice,
-              });
-            }
-            setEditingId(null);
-            return;
-          }
-          const createdCard = await createCard(cardPayload);
-          if (createdCard) {
-            for (const shopPrice of shop_prices) {
-              await createShopPrice({
-                card_id: createdCard.id,
-                ...shopPrice,
-              });
-            }
-          }
-        }}
-      />
-
-      <Card>
-        <CardContent className="grid gap-4 p-4 sm:grid-cols-[1fr_220px]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <Input className="pl-10" placeholder="カード名 / レア / 型番で検索" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    className="pl-10"
+                    placeholder="カード名 / レアリティ / 型番 / 状態で検索"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                </div>
+                <SelectField
+                  options={[
+                    { label: "すべて", value: "all" },
+                    { label: "所持中", value: "holding" },
+                    { label: "売却済", value: "sold" },
+                  ]}
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value as "all" | "holding" | "sold")}
+                />
+              </div>
+              <Button
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  setEditingId(null);
+                  setFormMode("create");
+                }}
+                size="lg"
+              >
+                <Plus className="mr-2 size-4" />
+                カードを追加
+              </Button>
+            </div>
           </div>
-          <SelectField
-            options={[
-              { label: "すべて", value: "all" },
-              { label: "所持中", value: "holding" },
-              { label: "売却済", value: "sold" },
-            ]}
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as "all" | "holding" | "sold")}
-          />
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">表示件数</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{filteredCards.length}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-emerald-700">所持中</p>
+              <p className="mt-2 text-2xl font-bold text-emerald-900">{holdingCount}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-600">売却済</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{soldCount}</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
+      <Dialog open={formMode !== null} onOpenChange={(open) => (!open ? closeDialog() : null)}>
+        <DialogContent className="p-0">
+          <DialogHeader className="px-5 pt-5 sm:px-6 sm:pt-6">
+            <DialogTitle>{formMode === "edit" ? "カードを編集" : "カードを追加"}</DialogTitle>
+            <DialogDescription>
+              {formMode === "edit"
+                ? "既存カードの内容を更新できます。必要なら店舗価格も一緒に追加できます。"
+                : "新しいカードをコレクションへ追加します。登録後は一覧が自動で更新されます。"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-1 pb-1 sm:px-2 sm:pb-2">
+            <CardForm
+              apps={apps}
+              initialValue={editingCard}
+              onCancel={closeDialog}
+              onSubmit={async (payload) => {
+                const { shop_prices, ...cardPayload } = payload;
+
+                if (editingCard) {
+                  await updateCard(editingCard.id, cardPayload);
+                  for (const shopPrice of shop_prices) {
+                    await createShopPrice({
+                      card_id: editingCard.id,
+                      ...shopPrice,
+                    });
+                  }
+                  closeDialog();
+                  return;
+                }
+
+                const createdCard = await createCard(cardPayload);
+                if (createdCard) {
+                  for (const shopPrice of shop_prices) {
+                    await createShopPrice({
+                      card_id: createdCard.id,
+                      ...shopPrice,
+                    });
+                  }
+                }
+                closeDialog();
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {filteredCards.length === 0 ? (
-        <EmptyState title="該当カードがありません" description="検索条件を変えるか、新しいカードを登録してください。" />
+        <EmptyState
+          title="表示できるカードがありません"
+          description="検索条件を変えるか、右上の「カードを追加」からコレクションに新しいカードを登録してください。"
+        />
       ) : (
         <>
-          <div className="grid gap-4 lg:hidden">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:hidden">
             {filteredCards.map((card) => (
-              <Card key={card.id}>
-                <CardContent className="space-y-4 p-4">
-                  <div className="grid grid-cols-[88px_1fr] gap-4">
-                    <CardImage alt={card.name} src={card.image_url} />
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-semibold text-slate-900">{card.name}</h3>
-                        <Badge>{card.status === "holding" ? "所持中" : "売却済"}</Badge>
-                      </div>
-                      <p className="text-sm text-slate-600">
-                        {card.rarity || "レア未入力"} / {card.model_number || "型番未入力"}
-                      </p>
-                      <p className="text-sm text-slate-600">枚数 {card.quantity} / 状態 {card.condition || "未入力"}</p>
-                      <p className="text-sm font-semibold text-slate-900">{formatCurrency(card.current_market_price)} / 枚</p>
-                      <p className="text-xs text-slate-500">{card.oripa_app?.name ?? "未分類"}</p>
+              <article
+                key={card.id}
+                className={`overflow-hidden rounded-[1.75rem] border shadow-soft transition-transform hover:-translate-y-0.5 ${
+                  card.status === "holding"
+                    ? "border-emerald-200 bg-white"
+                    : "border-slate-200 bg-slate-50/90"
+                }`}
+              >
+                <div className="relative">
+                  <CardImage alt={card.name} src={card.image_url} />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <Badge className={card.status === "holding" ? "bg-emerald-500 text-white" : "bg-slate-700 text-white"}>
+                        {card.status === "holding" ? "所持中" : "売却済"}
+                      </Badge>
+                      {card.condition ? <Badge className="bg-white/90 text-slate-900">{card.condition}</Badge> : null}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                </div>
+                <div className="space-y-3 p-4">
+                  <div className="space-y-1">
+                    <h3 className="line-clamp-2 min-h-[3rem] text-sm font-bold leading-6 text-slate-900">{card.name}</h3>
+                    <p className="text-xs text-slate-500">
+                      {card.rarity || "レア未入力"} / {card.model_number || "型番未入力"}
+                    </p>
+                  </div>
+                  <div className="grid gap-2">
+                    <div className="rounded-2xl bg-muted/60 px-3 py-2">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">現在相場</p>
+                      <p className="mt-1 text-base font-bold text-slate-900">{formatCurrency(card.current_market_price)}</p>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>枚数 {card.quantity}</span>
+                      <span>{card.oripa_app?.name ?? "未分類"}</span>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
                     <Button asChild size="sm" variant="outline">
                       <Link href={`/cards/${card.id}`}>
                         <Eye className="mr-2 size-4" />
                         詳細
                       </Link>
                     </Button>
-                    <Button onClick={() => setEditingId(card.id)} size="sm" variant="outline">
-                      <Pencil className="mr-2 size-4" />
+                    <Button
+                      onClick={() => {
+                        setEditingId(card.id);
+                        setFormMode("edit");
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
                       編集
                     </Button>
                     <Button onClick={() => void deleteCard(card.id)} size="sm" variant="destructive">
@@ -123,8 +231,8 @@ export function CardManager() {
                       削除
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </article>
             ))}
           </div>
 
@@ -134,31 +242,48 @@ export function CardManager() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>カード名</TableHead>
-                      <TableHead>アプリ</TableHead>
+                      <TableHead className="w-[88px]">画像</TableHead>
+                      <TableHead>カード情報</TableHead>
                       <TableHead>状態</TableHead>
                       <TableHead>枚数</TableHead>
-                      <TableHead>相場</TableHead>
-                      <TableHead>条件</TableHead>
-                      <TableHead className="w-40">操作</TableHead>
+                      <TableHead>現在相場</TableHead>
+                      <TableHead>アプリ</TableHead>
+                      <TableHead className="w-36">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredCards.map((card) => (
                       <TableRow key={card.id}>
                         <TableCell>
+                          <div className="w-14 overflow-hidden rounded-xl">
+                            <CardImage alt={card.name} src={card.image_url} />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-2">
+                            <div>
+                              <p className="font-semibold text-slate-900">{card.name}</p>
+                              <p className="text-xs text-slate-500">
+                                {card.rarity || "レア未入力"} / {card.model_number || "型番未入力"}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {card.condition ? <Badge className="bg-amber-100 text-amber-900">{card.condition}</Badge> : null}
+                              <Badge className={card.status === "holding" ? "bg-emerald-100 text-emerald-900" : "bg-slate-200 text-slate-800"}>
+                                {card.status === "holding" ? "所持中" : "売却済"}
+                              </Badge>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{card.condition || "-"}</TableCell>
+                        <TableCell>{card.quantity}</TableCell>
+                        <TableCell>
                           <div>
-                            <p className="font-medium text-slate-900">{card.name}</p>
-                            <p className="text-xs text-slate-500">
-                              {card.rarity || "-"} / {card.model_number || "-"}
-                            </p>
+                            <p className="font-semibold text-slate-900">{formatCurrency(card.current_market_price)}</p>
+                            <p className="text-xs text-slate-500">1枚あたり</p>
                           </div>
                         </TableCell>
                         <TableCell>{card.oripa_app?.name ?? "未分類"}</TableCell>
-                        <TableCell>{card.status === "holding" ? "所持中" : "売却済"}</TableCell>
-                        <TableCell>{card.quantity}</TableCell>
-                        <TableCell>{formatCurrency(card.current_market_price)}</TableCell>
-                        <TableCell>{card.condition ?? "-"}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button asChild size="icon" variant="outline">
@@ -166,8 +291,15 @@ export function CardManager() {
                                 <Eye className="size-4" />
                               </Link>
                             </Button>
-                            <Button onClick={() => setEditingId(card.id)} size="icon" variant="outline">
-                              <Pencil className="size-4" />
+                            <Button
+                              onClick={() => {
+                                setEditingId(card.id);
+                                setFormMode("edit");
+                              }}
+                              size="icon"
+                              variant="outline"
+                            >
+                              編集
                             </Button>
                             <Button onClick={() => void deleteCard(card.id)} size="icon" variant="destructive">
                               <Trash2 className="size-4" />
