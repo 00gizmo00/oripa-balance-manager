@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency } from "@/lib/utils";
 
 export function CardManager() {
-  const { apps, cards, createCard, updateCard, deleteCard } = useAppData();
+  const { apps, cards, createCard, updateCard, deleteCard, createShopPrice } = useAppData();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "holding" | "sold">("all");
@@ -41,12 +41,28 @@ export function CardManager() {
         initialValue={editingCard}
         onCancel={editingCard ? () => setEditingId(null) : undefined}
         onSubmit={async (payload) => {
+          const { shop_prices, ...cardPayload } = payload;
+
           if (editingCard) {
-            await updateCard(editingCard.id, payload);
+            await updateCard(editingCard.id, cardPayload);
+            for (const shopPrice of shop_prices) {
+              await createShopPrice({
+                card_id: editingCard.id,
+                ...shopPrice,
+              });
+            }
             setEditingId(null);
             return;
           }
-          await createCard(payload);
+          const createdCard = await createCard(cardPayload);
+          if (createdCard) {
+            for (const shopPrice of shop_prices) {
+              await createShopPrice({
+                card_id: createdCard.id,
+                ...shopPrice,
+              });
+            }
+          }
         }}
       />
 

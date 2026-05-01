@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ImageUp, Trash2 } from "lucide-react";
+import { ImageUp, Plus, Trash2 } from "lucide-react";
 import { ChangeEvent, ClipboardEvent, useEffect, useRef, useState } from "react";
 
 import { Field } from "@/components/forms/field";
@@ -26,6 +26,13 @@ interface CardFormProps {
     image_url?: string | null;
     memo?: string | null;
     status: "holding" | "sold";
+    shop_prices: Array<{
+      shop_name: string;
+      buy_price?: number | null;
+      sell_price?: number | null;
+      price_date: string;
+      memo?: string | null;
+    }>;
   }) => Promise<void>;
   onCancel?: () => void;
 }
@@ -42,6 +49,13 @@ function createDefaultForm(apps: OripaApp[], initialValue?: CardWithRelations) {
     image_url: initialValue?.image_url ?? "",
     memo: initialValue?.memo ?? "",
     status: initialValue?.status ?? ("holding" as const),
+    shop_prices: [] as Array<{
+      shop_name: string;
+      buy_price: string;
+      sell_price: string;
+      price_date: string;
+      memo: string;
+    }>,
   };
 }
 
@@ -98,6 +112,22 @@ export function CardForm({ apps, initialValue, onSubmit, onCancel }: CardFormPro
     await setImageFromFile(file);
   };
 
+  const addShopPriceRow = () => {
+    setForm((prev) => ({
+      ...prev,
+      shop_prices: [
+        ...prev.shop_prices,
+        {
+          shop_name: "",
+          buy_price: "",
+          sell_price: "",
+          price_date: new Date().toISOString().slice(0, 10),
+          memo: "",
+        },
+      ],
+    }));
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -124,6 +154,15 @@ export function CardForm({ apps, initialValue, onSubmit, onCancel }: CardFormPro
                 image_url: form.image_url || null,
                 memo: form.memo || null,
                 status: form.status,
+                shop_prices: form.shop_prices
+                  .filter((shopPrice) => shopPrice.shop_name.trim().length > 0)
+                  .map((shopPrice) => ({
+                    shop_name: shopPrice.shop_name,
+                    buy_price: shopPrice.buy_price ? Number(shopPrice.buy_price) : null,
+                    sell_price: shopPrice.sell_price ? Number(shopPrice.sell_price) : null,
+                    price_date: shopPrice.price_date,
+                    memo: shopPrice.memo || null,
+                  })),
               });
 
               if (!initialValue) {
@@ -233,6 +272,119 @@ export function CardForm({ apps, initialValue, onSubmit, onCancel }: CardFormPro
                 ) : null}
               </div>
             </Field>
+          </div>
+          <div className="space-y-3 sm:col-span-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-slate-700">複数店舗の現在相場メモ</p>
+                <p className="text-xs text-slate-600">
+                  作成時や編集時に店舗価格を複数件まとめて追加できます。既存の登録分は詳細画面でも確認できます。
+                </p>
+              </div>
+              <Button onClick={addShopPriceRow} type="button" variant="outline">
+                <Plus className="mr-2 size-4" />
+                店舗価格を追加
+              </Button>
+            </div>
+            {form.shop_prices.length ? (
+              form.shop_prices.map((shopPrice, index) => (
+                <div key={`${index}-${shopPrice.price_date}`} className="grid gap-3 rounded-2xl border border-border bg-muted/40 p-4 sm:grid-cols-2">
+                  <Field label="店舗名">
+                    <Input
+                      required
+                      value={shopPrice.shop_name}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          shop_prices: prev.shop_prices.map((current, currentIndex) =>
+                            currentIndex === index ? { ...current, shop_name: event.target.value } : current,
+                          ),
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="確認日">
+                    <Input
+                      required
+                      type="date"
+                      value={shopPrice.price_date}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          shop_prices: prev.shop_prices.map((current, currentIndex) =>
+                            currentIndex === index ? { ...current, price_date: event.target.value } : current,
+                          ),
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="買取価格">
+                    <Input
+                      inputMode="numeric"
+                      min={0}
+                      type="number"
+                      value={shopPrice.buy_price}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          shop_prices: prev.shop_prices.map((current, currentIndex) =>
+                            currentIndex === index ? { ...current, buy_price: event.target.value } : current,
+                          ),
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="販売価格">
+                    <Input
+                      inputMode="numeric"
+                      min={0}
+                      type="number"
+                      value={shopPrice.sell_price}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          shop_prices: prev.shop_prices.map((current, currentIndex) =>
+                            currentIndex === index ? { ...current, sell_price: event.target.value } : current,
+                          ),
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field className="sm:col-span-2" label="メモ">
+                    <Textarea
+                      value={shopPrice.memo}
+                      onChange={(event) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          shop_prices: prev.shop_prices.map((current, currentIndex) =>
+                            currentIndex === index ? { ...current, memo: event.target.value } : current,
+                          ),
+                        }))
+                      }
+                    />
+                  </Field>
+                  <div className="sm:col-span-2">
+                    <Button
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          shop_prices: prev.shop_prices.filter((_, currentIndex) => currentIndex !== index),
+                        }))
+                      }
+                      type="button"
+                      variant="outline"
+                    >
+                      <Trash2 className="mr-2 size-4" />
+                      この店舗価格を外す
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border bg-white/60 px-4 py-5 text-sm text-slate-600">
+                必要ならここで複数店舗の相場を追加できます。
+              </div>
+            )}
           </div>
           <Field className="sm:col-span-2" label="メモ">
             <Textarea value={form.memo} onChange={(event) => setForm((prev) => ({ ...prev, memo: event.target.value }))} />

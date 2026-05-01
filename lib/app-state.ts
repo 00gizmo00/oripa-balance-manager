@@ -52,7 +52,7 @@ interface AppStateResult {
   createSpendLog: (payload: SpendLogInsert) => Promise<void>;
   updateSpendLog: (id: string, payload: SpendLogUpdate) => Promise<void>;
   deleteSpendLog: (id: string) => Promise<void>;
-  createCard: (payload: CardInsert) => Promise<void>;
+  createCard: (payload: CardInsert) => Promise<CardWithRelations | null>;
   updateCard: (id: string, payload: CardUpdate) => Promise<void>;
   deleteCard: (id: string) => Promise<void>;
   createSale: (payload: SaleInsert) => Promise<void>;
@@ -121,6 +121,21 @@ export function useOripaAppState(): AppStateResult {
     [refreshAll],
   );
 
+  const wrapMutationWithResult = useCallback(
+    async <T,>(action: () => Promise<T>) => {
+      try {
+        setError(null);
+        const result = await action();
+        await refreshAll();
+        return result;
+      } catch (mutationError) {
+        setError(mutationError instanceof Error ? mutationError.message : "更新に失敗しました。");
+        throw mutationError;
+      }
+    },
+    [refreshAll],
+  );
+
   const metrics = useMemo(() => buildDashboardMetrics(cards, spendLogs), [cards, spendLogs]);
 
   return {
@@ -138,7 +153,8 @@ export function useOripaAppState(): AppStateResult {
     createSpendLog: async (payload) => wrapMutation(() => createSpendLog(payload)),
     updateSpendLog: async (id, payload) => wrapMutation(() => updateSpendLog(id, payload)),
     deleteSpendLog: async (id) => wrapMutation(() => deleteSpendLog(id)),
-    createCard: async (payload) => wrapMutation(() => createCard(payload)),
+    createCard: async (payload) =>
+      (wrapMutationWithResult(() => createCard(payload)) as unknown as Promise<CardWithRelations | null>),
     updateCard: async (id, payload) => wrapMutation(() => updateCard(id, payload)),
     deleteCard: async (id) => wrapMutation(() => deleteCard(id)),
     createSale: async (payload) => wrapMutation(() => createSale(payload)),
