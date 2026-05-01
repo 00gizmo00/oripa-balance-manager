@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Eye, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 
@@ -15,11 +16,49 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 type FormMode = "create" | "edit" | null;
 
+const HIGH_VALUE_THRESHOLD = 100000;
+
+function getRarityBadgeClass(rarity?: string | null) {
+  if (!rarity) {
+    return "bg-slate-200 text-slate-700";
+  }
+
+  const normalized = rarity.toUpperCase();
+
+  if (normalized.includes("SAR")) {
+    return "bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-200";
+  }
+  if (normalized.includes("UR")) {
+    return "bg-amber-100 text-amber-900 border border-amber-200";
+  }
+  if (normalized.includes("AR")) {
+    return "bg-sky-100 text-sky-900 border border-sky-200";
+  }
+  if (normalized.includes("SR")) {
+    return "bg-violet-100 text-violet-900 border border-violet-200";
+  }
+  if (normalized.includes("CHR") || normalized.includes("CSR")) {
+    return "bg-rose-100 text-rose-900 border border-rose-200";
+  }
+  if (normalized.includes("RRR")) {
+    return "bg-orange-100 text-orange-900 border border-orange-200";
+  }
+  if (normalized.includes("RR")) {
+    return "bg-emerald-100 text-emerald-900 border border-emerald-200";
+  }
+  if (normalized.includes("R")) {
+    return "bg-blue-100 text-blue-900 border border-blue-200";
+  }
+
+  return "bg-slate-200 text-slate-700 border border-slate-300";
+}
+
 export function CardManager() {
+  const router = useRouter();
   const { apps, cards, createCard, updateCard, deleteCard, createShopPrice } = useAppData();
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -175,11 +214,25 @@ export function CardManager() {
             {filteredCards.map((card) => (
               <article
                 key={card.id}
-                className={`overflow-hidden rounded-[1.75rem] border shadow-soft transition-transform hover:-translate-y-0.5 ${
+                className={cn(
+                  "overflow-hidden rounded-[1.75rem] border shadow-soft transition hover:-translate-y-0.5 active:scale-[0.99]",
+                  "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   card.status === "holding"
                     ? "border-emerald-200 bg-white"
-                    : "border-slate-200 bg-slate-50/90"
-                }`}
+                    : "border-slate-200 bg-slate-100/90 opacity-70 saturate-[0.75]",
+                  card.current_market_price >= HIGH_VALUE_THRESHOLD
+                    ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-background"
+                    : "",
+                )}
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(`/cards/${card.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    router.push(`/cards/${card.id}`);
+                  }
+                }}
               >
                 <div className="relative">
                   <CardImage alt={card.name} src={card.image_url} />
@@ -193,20 +246,33 @@ export function CardManager() {
                   </div>
                 </div>
                 <div className="space-y-3 p-4">
-                  <div className="space-y-1">
-                    <h3 className="line-clamp-2 min-h-[3rem] text-sm font-bold leading-6 text-slate-900">{card.name}</h3>
-                    <p className="text-xs text-slate-500">
-                      {card.rarity || "レア未入力"} / {card.model_number || "型番未入力"}
-                    </p>
-                  </div>
-                  <div className="grid gap-2">
-                    <div className="rounded-2xl bg-muted/60 px-3 py-2">
-                      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">現在相場</p>
-                      <p className="mt-1 text-base font-bold text-slate-900">{formatCurrency(card.current_market_price)}</p>
+                    <div className="space-y-1">
+                      <h3 className="line-clamp-2 min-h-[3rem] text-sm font-bold leading-6 text-slate-900">{card.name}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className={getRarityBadgeClass(card.rarity)}>{card.rarity || "レア未入力"}</Badge>
+                        <Badge className="bg-white/80 text-slate-700">{card.model_number || "型番未入力"}</Badge>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-slate-600">
-                      <span>枚数 {card.quantity}</span>
-                      <span>{card.oripa_app?.name ?? "未分類"}</span>
+                    <div className="grid gap-2">
+                      <div
+                        className={cn(
+                          "rounded-2xl px-3 py-2",
+                          card.current_market_price >= HIGH_VALUE_THRESHOLD
+                            ? "bg-amber-100 text-amber-950"
+                            : "bg-muted/60",
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">現在相場</p>
+                          {card.current_market_price >= HIGH_VALUE_THRESHOLD ? (
+                            <Badge className="bg-amber-500 text-white">高額</Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-base font-bold text-slate-900">{formatCurrency(card.current_market_price)}</p>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-600">
+                        <span>枚数 {card.quantity}</span>
+                        <span>{card.oripa_app?.name ?? "未分類"}</span>
                     </div>
                   </div>
                   <div className="grid gap-2">
@@ -217,7 +283,8 @@ export function CardManager() {
                       </Link>
                     </Button>
                     <Button
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setEditingId(card.id);
                         setFormMode("edit");
                       }}
@@ -226,7 +293,14 @@ export function CardManager() {
                     >
                       編集
                     </Button>
-                    <Button onClick={() => void deleteCard(card.id)} size="sm" variant="destructive">
+                    <Button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void deleteCard(card.id);
+                      }}
+                      size="sm"
+                      variant="destructive"
+                    >
                       <Trash2 className="mr-2 size-4" />
                       削除
                     </Button>
@@ -253,7 +327,15 @@ export function CardManager() {
                   </TableHeader>
                   <TableBody>
                     {filteredCards.map((card) => (
-                      <TableRow key={card.id}>
+                      <TableRow
+                        key={card.id}
+                        className={cn(
+                          "cursor-pointer",
+                          card.status === "sold" ? "bg-slate-50/80 text-slate-500" : "",
+                          card.current_market_price >= HIGH_VALUE_THRESHOLD ? "bg-amber-50/60" : "",
+                        )}
+                        onClick={() => router.push(`/cards/${card.id}`)}
+                      >
                         <TableCell>
                           <div className="w-14 overflow-hidden rounded-xl">
                             <CardImage alt={card.name} src={card.image_url} />
@@ -263,9 +345,10 @@ export function CardManager() {
                           <div className="space-y-2">
                             <div>
                               <p className="font-semibold text-slate-900">{card.name}</p>
-                              <p className="text-xs text-slate-500">
-                                {card.rarity || "レア未入力"} / {card.model_number || "型番未入力"}
-                              </p>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <Badge className={getRarityBadgeClass(card.rarity)}>{card.rarity || "レア未入力"}</Badge>
+                                <Badge className="bg-slate-100 text-slate-700">{card.model_number || "型番未入力"}</Badge>
+                              </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               {card.condition ? <Badge className="bg-amber-100 text-amber-900">{card.condition}</Badge> : null}
@@ -282,6 +365,9 @@ export function CardManager() {
                             <p className="font-semibold text-slate-900">{formatCurrency(card.current_market_price)}</p>
                             <p className="text-xs text-slate-500">1枚あたり</p>
                           </div>
+                          {card.current_market_price >= HIGH_VALUE_THRESHOLD ? (
+                            <Badge className="mt-2 bg-amber-500 text-white">高額カード</Badge>
+                          ) : null}
                         </TableCell>
                         <TableCell>{card.oripa_app?.name ?? "未分類"}</TableCell>
                         <TableCell>
@@ -292,7 +378,8 @@ export function CardManager() {
                               </Link>
                             </Button>
                             <Button
-                              onClick={() => {
+                              onClick={(event) => {
+                                event.stopPropagation();
                                 setEditingId(card.id);
                                 setFormMode("edit");
                               }}
@@ -301,7 +388,14 @@ export function CardManager() {
                             >
                               編集
                             </Button>
-                            <Button onClick={() => void deleteCard(card.id)} size="icon" variant="destructive">
+                            <Button
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void deleteCard(card.id);
+                              }}
+                              size="icon"
+                              variant="destructive"
+                            >
                               <Trash2 className="size-4" />
                             </Button>
                           </div>
