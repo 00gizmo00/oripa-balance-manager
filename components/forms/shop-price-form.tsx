@@ -34,7 +34,7 @@ export function ShopPriceForm({ cardId, onSubmit }: ShopPriceFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>店舗価格メモを追加</CardTitle>
+        <CardTitle>店舗価格を追加</CardTitle>
       </CardHeader>
       <CardContent>
         <form
@@ -64,7 +64,11 @@ export function ShopPriceForm({ cardId, onSubmit }: ShopPriceFormProps) {
           }}
         >
           <Field label="店舗名">
-            <Input required value={form.shop_name} onChange={(event) => setForm((prev) => ({ ...prev, shop_name: event.target.value }))} />
+            <Input
+              required
+              value={form.shop_name}
+              onChange={(event) => setForm((prev) => ({ ...prev, shop_name: event.target.value }))}
+            />
           </Field>
           <Field label="確認日">
             <Input

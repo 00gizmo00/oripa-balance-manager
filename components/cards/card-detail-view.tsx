@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, RefreshCcw, Trash2 } from "lucide-react";
 
 import { CardImage } from "@/components/cards/card-image";
 import { SaleForm } from "@/components/forms/sale-form";
@@ -19,9 +19,14 @@ export function CardDetailView({ cardId }: { cardId: string }) {
 
   if (!card) {
     return (
-      <EmptyState title="カードが見つかりません" description="削除済みか、まだデータ読み込みが完了していない可能性があります。" />
+      <EmptyState
+        title="カードが見つかりません"
+        description="削除済みか、まだデータ読み込みが完了していない可能性があります。"
+      />
     );
   }
+
+  const sortedShopPrices = [...(card.shop_prices ?? [])].sort((a, b) => b.price_date.localeCompare(a.price_date));
 
   return (
     <div className="space-y-6">
@@ -97,29 +102,49 @@ export function CardDetailView({ cardId }: { cardId: string }) {
 
           <Card>
             <CardHeader>
-              <CardTitle>店舗価格メモ</CardTitle>
+              <CardTitle>店舗価格一覧</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {card.shop_prices?.length ? (
-                card.shop_prices.map((shopPrice) => (
-                  <div key={shopPrice.id} className="flex items-start justify-between gap-3 rounded-2xl bg-muted/60 p-4">
-                    <div className="space-y-1">
-                      <p className="font-medium text-slate-900">
-                        {shopPrice.shop_name} / {new Date(shopPrice.price_date).toLocaleDateString("ja-JP")}
-                      </p>
-                      <p className="text-sm text-slate-600">
-                        買取 {shopPrice.buy_price ? formatCurrency(shopPrice.buy_price) : "-"} / 販売{" "}
-                        {shopPrice.sell_price ? formatCurrency(shopPrice.sell_price) : "-"}
-                      </p>
-                      {shopPrice.memo ? <p className="text-sm text-slate-600">{shopPrice.memo}</p> : null}
+              {sortedShopPrices.length ? (
+                sortedShopPrices.map((shopPrice) => {
+                  const candidatePrice = shopPrice.sell_price ?? shopPrice.buy_price ?? 0;
+
+                  return (
+                    <div key={shopPrice.id} className="space-y-3 rounded-2xl bg-muted/60 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="font-medium text-slate-900">
+                            {shopPrice.shop_name} / {new Date(shopPrice.price_date).toLocaleDateString("ja-JP")}
+                          </p>
+                          <p className="text-sm text-slate-600">
+                            買取 {shopPrice.buy_price ? formatCurrency(shopPrice.buy_price) : "-"} / 販売{" "}
+                            {shopPrice.sell_price ? formatCurrency(shopPrice.sell_price) : "-"}
+                          </p>
+                          {shopPrice.memo ? <p className="text-sm text-slate-600">{shopPrice.memo}</p> : null}
+                        </div>
+                        <Button onClick={() => void deleteShopPrice(shopPrice.id)} size="icon" variant="destructive">
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          disabled={!candidatePrice}
+                          onClick={() => void updateCard(card.id, { current_market_price: candidatePrice })}
+                          size="sm"
+                          variant="outline"
+                        >
+                          <RefreshCcw className="mr-2 size-4" />
+                          この価格を現在相場に反映
+                        </Button>
+                      </div>
                     </div>
-                    <Button onClick={() => void deleteShopPrice(shopPrice.id)} size="icon" variant="destructive">
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                ))
+                  );
+                })
               ) : (
-                <EmptyState title="店舗価格メモなし" description="ショップの買取・販売価格を後から見返せるように残せます。" />
+                <EmptyState
+                  title="店舗価格メモなし"
+                  description="ショップごとの買取・販売価格を何件でも残せます。必要な価格を現在相場へ反映できます。"
+                />
               )}
             </CardContent>
           </Card>

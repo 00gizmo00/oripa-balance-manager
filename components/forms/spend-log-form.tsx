@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Field } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
@@ -18,14 +18,22 @@ interface SpendLogFormProps {
   onCancel?: () => void;
 }
 
-export function SpendLogForm({ apps, initialValue, onSubmit, onCancel }: SpendLogFormProps) {
-  const [form, setForm] = useState({
+function createDefaultForm(apps: OripaApp[], initialValue?: SpendLogWithApp) {
+  return {
     oripa_app_id: initialValue?.oripa_app_id ?? apps[0]?.id ?? "",
     amount: initialValue?.amount?.toString() ?? "",
     spend_date: initialValue?.spend_date ?? format(new Date(), "yyyy-MM-dd"),
     memo: initialValue?.memo ?? "",
-  });
+  };
+}
+
+export function SpendLogForm({ apps, initialValue, onSubmit, onCancel }: SpendLogFormProps) {
+  const [form, setForm] = useState(createDefaultForm(apps, initialValue));
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setForm(createDefaultForm(apps, initialValue));
+  }, [apps, initialValue]);
 
   return (
     <Card>
@@ -48,12 +56,7 @@ export function SpendLogForm({ apps, initialValue, onSubmit, onCancel }: SpendLo
               });
 
               if (!initialValue) {
-                setForm({
-                  oripa_app_id: apps[0]?.id ?? "",
-                  amount: "",
-                  spend_date: format(new Date(), "yyyy-MM-dd"),
-                  memo: "",
-                });
+                setForm(createDefaultForm(apps));
               }
             } finally {
               setSubmitting(false);

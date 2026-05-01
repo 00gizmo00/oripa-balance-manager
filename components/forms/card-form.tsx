@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
+import { ImageUp, Trash2 } from "lucide-react";
+import { ChangeEvent, ClipboardEvent, useEffect, useRef, useState } from "react";
 
 import { Field } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
@@ -28,8 +30,8 @@ interface CardFormProps {
   onCancel?: () => void;
 }
 
-export function CardForm({ apps, initialValue, onSubmit, onCancel }: CardFormProps) {
-  const [form, setForm] = useState({
+function createDefaultForm(apps: OripaApp[], initialValue?: CardWithRelations) {
+  return {
     name: initialValue?.name ?? "",
     rarity: initialValue?.rarity ?? "",
     model_number: initialValue?.model_number ?? "",
@@ -40,14 +42,69 @@ export function CardForm({ apps, initialValue, onSubmit, onCancel }: CardFormPro
     image_url: initialValue?.image_url ?? "",
     memo: initialValue?.memo ?? "",
     status: initialValue?.status ?? ("holding" as const),
+  };
+}
+
+async function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("画像の読み込みに失敗しました。"));
+    reader.readAsDataURL(file);
   });
+}
+
+export function CardForm({ apps, initialValue, onSubmit, onCancel }: CardFormProps) {
+  const [form, setForm] = useState(createDefaultForm(apps, initialValue));
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setForm(createDefaultForm(apps, initialValue));
+  }, [apps, initialValue]);
+
+  const setImageFromFile = async (file: File) => {
+    setUploadingImage(true);
+    try {
+      const imageUrl = await readFileAsDataUrl(file);
+      setForm((prev) => ({ ...prev, image_url: imageUrl }));
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    await setImageFromFile(file);
+    event.target.value = "";
+  };
+
+  const handlePaste = async (event: ClipboardEvent<HTMLDivElement>) => {
+    const imageItem = Array.from(event.clipboardData.items).find((item) => item.type.startsWith("image/"));
+    if (!imageItem) {
+      return;
+    }
+
+    const file = imageItem.getAsFile();
+    if (!file) {
+      return;
+    }
+
+    event.preventDefault();
+    await setImageFromFile(file);
+  };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{initialValue ? "カードを編集" : "カードを登録"}</CardTitle>
-        <CardDescription>所持枚数と現在相場を入力して、含み益の把握に使います。</CardDescription>
+        <CardDescription>
+          編集時は既存内容がフォームに入ります。複数店舗の相場は登録後に詳細画面から何件でも追加できます。
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -70,18 +127,7 @@ export function CardForm({ apps, initialValue, onSubmit, onCancel }: CardFormPro
               });
 
               if (!initialValue) {
-                setForm({
-                  name: "",
-                  rarity: "",
-                  model_number: "",
-                  quantity: "1",
-                  condition: "",
-                  oripa_app_id: "",
-                  current_market_price: "0",
-                  image_url: "",
-                  memo: "",
-                  status: "holding",
-                });
+                setForm(createDefaultForm(apps));
               }
             } finally {
               setSubmitting(false);
@@ -147,15 +193,56 @@ export function CardForm({ apps, initialValue, onSubmit, onCancel }: CardFormPro
           <Field className="sm:col-span-2" label="画像URL">
             <Input value={form.image_url} onChange={(event) => setForm((prev) => ({ ...prev, image_url: event.target.value }))} />
           </Field>
+          <div className="sm:col-span-2">
+            <Field label="画像ファイル / スクショ">
+              <div
+                className="space-y-3 rounded-2xl border border-dashed border-border bg-muted/40 p-4"
+                onPaste={(event) => void handlePaste(event)}
+              >
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    ref={fileInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    type="file"
+                    onChange={(event) => void handleFileChange(event)}
+                  />
+                  <Button onClick={() => fileInputRef.current?.click()} type="button" variant="outline">
+                    <ImageUp className="mr-2 size-4" />
+                    画像を選択
+                  </Button>
+                  {form.image_url ? (
+                    <Button onClick={() => setForm((prev) => ({ ...prev, image_url: "" }))} type="button" variant="outline">
+                      <Trash2 className="mr-2 size-4" />
+                      画像をクリア
+                    </Button>
+                  ) : null}
+                </div>
+                <p className="text-xs text-slate-600">
+                  スクショ画像や写真を選択できます。PC ではこの枠に画像を貼り付けることもできます。
+                </p>
+                {uploadingImage ? <p className="text-xs text-slate-600">画像を読み込み中...</p> : null}
+                {form.image_url ? (
+                  <div className="relative h-40 w-28 overflow-hidden rounded-xl border border-border bg-white">
+                    {form.image_url.startsWith("data:") ? (
+                      <img alt="カード画像プレビュー" className="h-full w-full object-cover" src={form.image_url} />
+                    ) : (
+                      <Image alt="カード画像プレビュー" fill className="object-cover" sizes="112px" src={form.image_url} unoptimized />
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </Field>
+          </div>
           <Field className="sm:col-span-2" label="メモ">
             <Textarea value={form.memo} onChange={(event) => setForm((prev) => ({ ...prev, memo: event.target.value }))} />
           </Field>
           <div className="flex gap-2 sm:col-span-2">
-            <Button disabled={submitting} type="submit">
+            <Button disabled={submitting || uploadingImage} type="submit">
               {submitting ? "保存中..." : initialValue ? "更新する" : "追加する"}
             </Button>
             {onCancel ? (
-              <Button disabled={submitting} onClick={onCancel} type="button" variant="outline">
+              <Button disabled={submitting || uploadingImage} onClick={onCancel} type="button" variant="outline">
                 キャンセル
               </Button>
             ) : null}

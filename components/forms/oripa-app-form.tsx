@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Field } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,10 @@ interface OripaAppFormProps {
 export function OripaAppForm({ initialValue, onSubmit, onCancel }: OripaAppFormProps) {
   const [name, setName] = useState(initialValue?.name ?? "");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setName(initialValue?.name ?? "");
+  }, [initialValue]);
 
   return (
     <Card>
@@ -40,8 +44,8 @@ export function OripaAppForm({ initialValue, onSubmit, onCancel }: OripaAppFormP
             }
           }}
         >
-          <Field label="アプリ名" htmlFor="app-name">
-            <Input id="app-name" value={name} onChange={(event) => setName(event.target.value)} required />
+          <Field htmlFor="app-name" label="アプリ名">
+            <Input id="app-name" required value={name} onChange={(event) => setName(event.target.value)} />
           </Field>
           <div className="flex gap-2">
             <Button disabled={submitting} type="submit">

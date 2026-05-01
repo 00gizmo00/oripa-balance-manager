@@ -13,9 +13,17 @@ export function CardImage({ src, alt }: { src?: string | null; alt: string }) {
     );
   }
 
+  if (src.startsWith("data:")) {
+    return (
+      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-slate-100">
+        <img alt={alt} className="h-full w-full object-cover" src={src} />
+      </div>
+    );
+  }
+
   return (
     <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-slate-100">
-      <Image alt={alt} fill className="object-cover" sizes="(max-width: 768px) 100vw, 240px" src={src} />
+      <Image alt={alt} fill className="object-cover" sizes="(max-width: 768px) 100vw, 240px" src={src} unoptimized />
     </div>
   );
 }
