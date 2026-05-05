@@ -330,3 +330,9 @@ npm run dev
 - OCR でカード登録補助
 - CSV エクスポート
 - 集計期間フィルター
+## 2026-05 Additional Notes
+
+- `cards.sold_at` was added to keep the date when a card became sold.
+- For an existing Supabase project, run `supabase/migrations/20260505_000002_add_sold_at_to_cards.sql` in the SQL Editor.
+- The dashboard now includes per-app profit analysis.
+- The dashboard header now has a backup button that downloads the current data as JSON.

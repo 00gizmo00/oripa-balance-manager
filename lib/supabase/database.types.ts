@@ -80,6 +80,7 @@ export interface Database {
           image_url: string | null;
           memo: string | null;
           status: "holding" | "sold";
+          sold_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -95,6 +96,7 @@ export interface Database {
           image_url?: string | null;
           memo?: string | null;
           status?: "holding" | "sold";
+          sold_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -110,6 +112,7 @@ export interface Database {
           image_url?: string | null;
           memo?: string | null;
           status?: "holding" | "sold";
+          sold_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -13,19 +13,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 
+function formatDate(date?: string | null) {
+  if (!date) {
+    return "未記録";
+  }
+
+  return new Date(date).toLocaleDateString("ja-JP");
+}
+
 export function CardDetailView({ cardId }: { cardId: string }) {
   const { cards, createSale, deleteSale, createShopPrice, deleteShopPrice, updateCard } = useAppData();
   const card = cards.find((item) => item.id === cardId);
 
   if (!card) {
-    return (
-      <EmptyState
-        title="カードが見つかりません"
-        description="削除済みか、まだデータ読み込みが完了していない可能性があります。"
-      />
-    );
+    return <EmptyState title="カードが見つかりません" description="一覧に戻って、カードが削除されていないか確認してください。" />;
   }
 
+  const sortedSales = [...(card.sales ?? [])].sort((a, b) => b.sold_date.localeCompare(a.sold_date));
   const sortedShopPrices = [...(card.shop_prices ?? [])].sort((a, b) => b.price_date.localeCompare(a.price_date));
 
   return (
@@ -47,19 +51,36 @@ export function CardDetailView({ cardId }: { cardId: string }) {
                 <Badge>{card.status === "holding" ? "所持中" : "売却済"}</Badge>
               </div>
               <p className="text-sm text-slate-600">
-                {card.rarity || "レア未入力"} / {card.model_number || "型番未入力"}
+                {card.rarity || "レアリティ未入力"} / {card.model_number || "型番未入力"}
               </p>
               <p className="text-sm text-slate-600">状態 {card.condition || "未入力"} / 枚数 {card.quantity}</p>
               <p className="text-sm text-slate-600">由来アプリ {card.oripa_app?.name ?? "未分類"}</p>
+              <p className="text-sm text-slate-600">売却状態にした日 {formatDate(card.sold_at)}</p>
               <p className="text-lg font-semibold text-slate-900">{formatCurrency(card.current_market_price)} / 枚</p>
               <p className="text-sm text-slate-600">所持評価額 {formatCurrency(card.current_market_price * card.quantity)}</p>
               {card.memo ? <p className="rounded-2xl bg-muted/60 p-3 text-sm text-slate-700">{card.memo}</p> : null}
               {card.status === "holding" ? (
-                <Button onClick={() => void updateCard(card.id, { status: "sold" })} variant="outline">
+                <Button
+                  onClick={() =>
+                    void updateCard(card.id, {
+                      status: "sold",
+                      sold_at: new Date().toISOString().slice(0, 10),
+                    })
+                  }
+                  variant="outline"
+                >
                   売却済に変更
                 </Button>
               ) : (
-                <Button onClick={() => void updateCard(card.id, { status: "holding" })} variant="outline">
+                <Button
+                  onClick={() =>
+                    void updateCard(card.id, {
+                      status: "holding",
+                      sold_at: null,
+                    })
+                  }
+                  variant="outline"
+                >
                   所持中に戻す
                 </Button>
               )}
@@ -75,12 +96,12 @@ export function CardDetailView({ cardId }: { cardId: string }) {
               <CardTitle>売却履歴</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {card.sales?.length ? (
-                card.sales.map((sale) => (
+              {sortedSales.length ? (
+                sortedSales.map((sale) => (
                   <div key={sale.id} className="flex items-start justify-between gap-3 rounded-2xl bg-muted/60 p-4">
                     <div className="space-y-1">
                       <p className="font-medium text-slate-900">
-                        {new Date(sale.sold_date).toLocaleDateString("ja-JP")} / {formatCurrency(sale.sold_price)}
+                        {formatDate(sale.sold_date)} / {formatCurrency(sale.sold_price)}
                       </p>
                       <p className="text-sm text-slate-600">
                         手数料 {formatCurrency(sale.fee)} / 送料 {formatCurrency(sale.shipping)} / 売却先 {sale.sold_to || "未入力"}
@@ -93,7 +114,7 @@ export function CardDetailView({ cardId }: { cardId: string }) {
                   </div>
                 ))
               ) : (
-                <EmptyState title="売却履歴なし" description="売却したらここから履歴を追加します。" />
+                <EmptyState title="売却履歴はまだありません" description="売却したらここに履歴が残り、売却日に合わせて状態も更新されます。" />
               )}
             </CardContent>
           </Card>
@@ -102,7 +123,7 @@ export function CardDetailView({ cardId }: { cardId: string }) {
 
           <Card>
             <CardHeader>
-              <CardTitle>店舗価格一覧</CardTitle>
+              <CardTitle>店舗価格メモ一覧</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {sortedShopPrices.length ? (
@@ -114,7 +135,7 @@ export function CardDetailView({ cardId }: { cardId: string }) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
                           <p className="font-medium text-slate-900">
-                            {shopPrice.shop_name} / {new Date(shopPrice.price_date).toLocaleDateString("ja-JP")}
+                            {shopPrice.shop_name} / {formatDate(shopPrice.price_date)}
                           </p>
                           <p className="text-sm text-slate-600">
                             買取 {shopPrice.buy_price ? formatCurrency(shopPrice.buy_price) : "-"} / 販売{" "}
@@ -142,8 +163,8 @@ export function CardDetailView({ cardId }: { cardId: string }) {
                 })
               ) : (
                 <EmptyState
-                  title="店舗価格メモなし"
-                  description="ショップごとの買取・販売価格を何件でも残せます。必要な価格を現在相場へ反映できます。"
+                  title="店舗価格メモがありません"
+                  description="ショップごとの買取・販売価格を登録しておくと、あとで現在相場に反映できます。"
                 />
               )}
             </CardContent>

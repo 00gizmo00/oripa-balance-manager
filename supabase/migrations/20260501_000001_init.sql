@@ -39,6 +39,7 @@ create table if not exists public.cards (
   image_url text,
   memo text,
   status text not null default 'holding' check (status in ('holding', 'sold')),
+  sold_at date,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

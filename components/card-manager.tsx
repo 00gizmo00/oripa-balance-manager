@@ -30,31 +30,39 @@ function getRarityBadgeClass(rarity?: string | null) {
   const normalized = rarity.toUpperCase();
 
   if (normalized.includes("SAR")) {
-    return "bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-200";
+    return "border border-fuchsia-200 bg-fuchsia-100 text-fuchsia-900";
   }
   if (normalized.includes("UR")) {
-    return "bg-amber-100 text-amber-900 border border-amber-200";
+    return "border border-amber-200 bg-amber-100 text-amber-900";
   }
   if (normalized.includes("AR")) {
-    return "bg-sky-100 text-sky-900 border border-sky-200";
+    return "border border-sky-200 bg-sky-100 text-sky-900";
   }
   if (normalized.includes("SR")) {
-    return "bg-violet-100 text-violet-900 border border-violet-200";
+    return "border border-violet-200 bg-violet-100 text-violet-900";
   }
   if (normalized.includes("CHR") || normalized.includes("CSR")) {
-    return "bg-rose-100 text-rose-900 border border-rose-200";
+    return "border border-rose-200 bg-rose-100 text-rose-900";
   }
   if (normalized.includes("RRR")) {
-    return "bg-orange-100 text-orange-900 border border-orange-200";
+    return "border border-orange-200 bg-orange-100 text-orange-900";
   }
   if (normalized.includes("RR")) {
-    return "bg-emerald-100 text-emerald-900 border border-emerald-200";
+    return "border border-emerald-200 bg-emerald-100 text-emerald-900";
   }
   if (normalized.includes("R")) {
-    return "bg-blue-100 text-blue-900 border border-blue-200";
+    return "border border-blue-200 bg-blue-100 text-blue-900";
   }
 
-  return "bg-slate-200 text-slate-700 border border-slate-300";
+  return "border border-slate-300 bg-slate-200 text-slate-700";
+}
+
+function formatShortDate(date?: string | null) {
+  if (!date) {
+    return null;
+  }
+
+  return new Date(date).toLocaleDateString("ja-JP");
 }
 
 export function CardManager() {
@@ -71,10 +79,11 @@ export function CardManager() {
     return cards.filter((card) => {
       const matchesQuery =
         query.length === 0 ||
-        [card.name, card.rarity, card.model_number, card.condition].some((value) =>
+        [card.name, card.rarity, card.model_number, card.condition, card.oripa_app?.name].some((value) =>
           value?.toLowerCase().includes(query.toLowerCase()),
         );
       const matchesStatus = statusFilter === "all" ? true : card.status === statusFilter;
+
       return matchesQuery && matchesStatus;
     });
   }, [cards, query, statusFilter]);
@@ -100,7 +109,7 @@ export function CardManager() {
               <div>
                 <h3 className="text-2xl font-bold tracking-tight text-slate-900">カードコレクション</h3>
                 <p className="mt-2 text-sm text-slate-600">
-                  一覧を最優先で見られるようにしつつ、追加や編集は必要なときだけ開けるようにしています。
+                  一覧を先に眺められるようにしつつ、検索・状態フィルター・追加・編集をここからまとめて扱えます。
                 </p>
               </div>
             </div>
@@ -111,7 +120,7 @@ export function CardManager() {
                   <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     className="pl-10"
-                    placeholder="カード名 / レアリティ / 型番 / 状態で検索"
+                    placeholder="カード名 / レアリティ / 型番 / 状態 / アプリ"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                   />
@@ -163,8 +172,8 @@ export function CardManager() {
             <DialogTitle>{formMode === "edit" ? "カードを編集" : "カードを追加"}</DialogTitle>
             <DialogDescription>
               {formMode === "edit"
-                ? "既存カードの内容を更新できます。必要なら店舗価格も一緒に追加できます。"
-                : "新しいカードをコレクションへ追加します。登録後は一覧が自動で更新されます。"}
+                ? "既存カードの情報を更新します。必要なら店舗価格メモもまとめて追加できます。"
+                : "新しいカードをコレクションに追加します。"}
             </DialogDescription>
           </DialogHeader>
           <div className="px-1 pb-1 sm:px-2 sm:pb-2">
@@ -174,9 +183,16 @@ export function CardManager() {
               onCancel={closeDialog}
               onSubmit={async (payload) => {
                 const { shop_prices, ...cardPayload } = payload;
+                const normalizedCardPayload = {
+                  ...cardPayload,
+                  sold_at:
+                    cardPayload.status === "sold"
+                      ? editingCard?.sold_at ?? new Date().toISOString().slice(0, 10)
+                      : null,
+                };
 
                 if (editingCard) {
-                  await updateCard(editingCard.id, cardPayload);
+                  await updateCard(editingCard.id, normalizedCardPayload);
                   for (const shopPrice of shop_prices) {
                     await createShopPrice({
                       card_id: editingCard.id,
@@ -187,7 +203,7 @@ export function CardManager() {
                   return;
                 }
 
-                const createdCard = await createCard(cardPayload);
+                const createdCard = await createCard(normalizedCardPayload);
                 if (createdCard) {
                   for (const shopPrice of shop_prices) {
                     await createShopPrice({
@@ -206,60 +222,62 @@ export function CardManager() {
       {filteredCards.length === 0 ? (
         <EmptyState
           title="表示できるカードがありません"
-          description="検索条件を変えるか、右上の「カードを追加」からコレクションに新しいカードを登録してください。"
+          description="検索条件を変えるか、上の「カードを追加」からコレクションに新しいカードを登録してください。"
         />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:hidden">
-            {filteredCards.map((card) => (
-              <article
-                key={card.id}
-                className={cn(
-                  "overflow-hidden rounded-[1.75rem] border shadow-soft transition hover:-translate-y-0.5 active:scale-[0.99]",
-                  "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  card.status === "holding"
-                    ? "border-emerald-200 bg-white"
-                    : "border-slate-200 bg-slate-100/90 opacity-70 saturate-[0.75]",
-                  card.current_market_price >= HIGH_VALUE_THRESHOLD
-                    ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-background"
-                    : "",
-                )}
-                role="link"
-                tabIndex={0}
-                onClick={() => router.push(`/cards/${card.id}`)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    router.push(`/cards/${card.id}`);
-                  }
-                }}
-              >
-                <div className="relative">
-                  <CardImage alt={card.name} src={card.image_url} />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <Badge className={card.status === "holding" ? "bg-emerald-500 text-white" : "bg-slate-700 text-white"}>
-                        {card.status === "holding" ? "所持中" : "売却済"}
-                      </Badge>
-                      {card.condition ? <Badge className="bg-white/90 text-slate-900">{card.condition}</Badge> : null}
+            {filteredCards.map((card) => {
+              const soldAt = formatShortDate(card.sold_at);
+
+              return (
+                <article
+                  key={card.id}
+                  className={cn(
+                    "cursor-pointer overflow-hidden rounded-[1.75rem] border shadow-soft transition hover:-translate-y-0.5 active:scale-[0.99]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    card.status === "holding"
+                      ? "border-emerald-200 bg-white"
+                      : "border-slate-200 bg-slate-100/90 opacity-70 saturate-[0.75]",
+                    card.current_market_price >= HIGH_VALUE_THRESHOLD
+                      ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-background"
+                      : "",
+                  )}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => router.push(`/cards/${card.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(`/cards/${card.id}`);
+                    }
+                  }}
+                >
+                  <div className="relative">
+                    <CardImage alt={card.name} src={card.image_url} />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <Badge className={card.status === "holding" ? "bg-emerald-500 text-white" : "bg-slate-700 text-white"}>
+                          {card.status === "holding" ? "所持中" : "売却済"}
+                        </Badge>
+                        {card.condition ? <Badge className="bg-white/90 text-slate-900">{card.condition}</Badge> : null}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="space-y-3 p-4">
+                  <div className="space-y-3 p-4">
                     <div className="space-y-1">
                       <h3 className="line-clamp-2 min-h-[3rem] text-sm font-bold leading-6 text-slate-900">{card.name}</h3>
                       <div className="flex flex-wrap gap-2">
-                        <Badge className={getRarityBadgeClass(card.rarity)}>{card.rarity || "レア未入力"}</Badge>
+                        <Badge className={getRarityBadgeClass(card.rarity)}>{card.rarity || "レアリティ未入力"}</Badge>
                         <Badge className="bg-white/80 text-slate-700">{card.model_number || "型番未入力"}</Badge>
                       </div>
                     </div>
+
                     <div className="grid gap-2">
                       <div
                         className={cn(
                           "rounded-2xl px-3 py-2",
-                          card.current_market_price >= HIGH_VALUE_THRESHOLD
-                            ? "bg-amber-100 text-amber-950"
-                            : "bg-muted/60",
+                          card.current_market_price >= HIGH_VALUE_THRESHOLD ? "bg-amber-100 text-amber-950" : "bg-muted/60",
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -273,41 +291,44 @@ export function CardManager() {
                       <div className="flex items-center justify-between text-xs text-slate-600">
                         <span>枚数 {card.quantity}</span>
                         <span>{card.oripa_app?.name ?? "未分類"}</span>
+                      </div>
+                      {soldAt ? <p className="text-xs text-slate-500">売却状態記録日 {soldAt}</p> : null}
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/cards/${card.id}`}>
+                          <Eye className="mr-2 size-4" />
+                          詳細
+                        </Link>
+                      </Button>
+                      <Button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setEditingId(card.id);
+                          setFormMode("edit");
+                        }}
+                        size="sm"
+                        variant="outline"
+                      >
+                        編集
+                      </Button>
+                      <Button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void deleteCard(card.id);
+                        }}
+                        size="sm"
+                        variant="destructive"
+                      >
+                        <Trash2 className="mr-2 size-4" />
+                        削除
+                      </Button>
                     </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/cards/${card.id}`}>
-                        <Eye className="mr-2 size-4" />
-                        詳細
-                      </Link>
-                    </Button>
-                    <Button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setEditingId(card.id);
-                        setFormMode("edit");
-                      }}
-                      size="sm"
-                      variant="outline"
-                    >
-                      編集
-                    </Button>
-                    <Button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void deleteCard(card.id);
-                      }}
-                      size="sm"
-                      variant="destructive"
-                    >
-                      <Trash2 className="mr-2 size-4" />
-                      削除
-                    </Button>
-                  </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
 
           <Card className="hidden lg:block">
@@ -326,82 +347,87 @@ export function CardManager() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCards.map((card) => (
-                      <TableRow
-                        key={card.id}
-                        className={cn(
-                          "cursor-pointer",
-                          card.status === "sold" ? "bg-slate-50/80 text-slate-500" : "",
-                          card.current_market_price >= HIGH_VALUE_THRESHOLD ? "bg-amber-50/60" : "",
-                        )}
-                        onClick={() => router.push(`/cards/${card.id}`)}
-                      >
-                        <TableCell>
-                          <div className="w-14 overflow-hidden rounded-xl">
-                            <CardImage alt={card.name} src={card.image_url} />
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-2">
-                            <div>
-                              <p className="font-semibold text-slate-900">{card.name}</p>
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                <Badge className={getRarityBadgeClass(card.rarity)}>{card.rarity || "レア未入力"}</Badge>
-                                <Badge className="bg-slate-100 text-slate-700">{card.model_number || "型番未入力"}</Badge>
+                    {filteredCards.map((card) => {
+                      const soldAt = formatShortDate(card.sold_at);
+
+                      return (
+                        <TableRow
+                          key={card.id}
+                          className={cn(
+                            "cursor-pointer",
+                            card.status === "sold" ? "bg-slate-50/80 text-slate-500" : "",
+                            card.current_market_price >= HIGH_VALUE_THRESHOLD ? "bg-amber-50/60" : "",
+                          )}
+                          onClick={() => router.push(`/cards/${card.id}`)}
+                        >
+                          <TableCell>
+                            <div className="w-14 overflow-hidden rounded-xl">
+                              <CardImage alt={card.name} src={card.image_url} />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-2">
+                              <div>
+                                <p className="font-semibold text-slate-900">{card.name}</p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <Badge className={getRarityBadgeClass(card.rarity)}>{card.rarity || "レアリティ未入力"}</Badge>
+                                  <Badge className="bg-slate-100 text-slate-700">{card.model_number || "型番未入力"}</Badge>
+                                </div>
                               </div>
+                              <div className="flex flex-wrap gap-2">
+                                {card.condition ? <Badge className="bg-amber-100 text-amber-900">{card.condition}</Badge> : null}
+                                <Badge className={card.status === "holding" ? "bg-emerald-100 text-emerald-900" : "bg-slate-200 text-slate-800"}>
+                                  {card.status === "holding" ? "所持中" : "売却済"}
+                                </Badge>
+                              </div>
+                              {soldAt ? <p className="text-xs text-slate-500">売却状態記録日 {soldAt}</p> : null}
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              {card.condition ? <Badge className="bg-amber-100 text-amber-900">{card.condition}</Badge> : null}
-                              <Badge className={card.status === "holding" ? "bg-emerald-100 text-emerald-900" : "bg-slate-200 text-slate-800"}>
-                                {card.status === "holding" ? "所持中" : "売却済"}
-                              </Badge>
+                          </TableCell>
+                          <TableCell>{card.condition || "-"}</TableCell>
+                          <TableCell>{card.quantity}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-semibold text-slate-900">{formatCurrency(card.current_market_price)}</p>
+                              <p className="text-xs text-slate-500">1枚あたり</p>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{card.condition || "-"}</TableCell>
-                        <TableCell>{card.quantity}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-semibold text-slate-900">{formatCurrency(card.current_market_price)}</p>
-                            <p className="text-xs text-slate-500">1枚あたり</p>
-                          </div>
-                          {card.current_market_price >= HIGH_VALUE_THRESHOLD ? (
-                            <Badge className="mt-2 bg-amber-500 text-white">高額カード</Badge>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>{card.oripa_app?.name ?? "未分類"}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button asChild size="icon" variant="outline">
-                              <Link href={`/cards/${card.id}`}>
-                                <Eye className="size-4" />
-                              </Link>
-                            </Button>
-                            <Button
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setEditingId(card.id);
-                                setFormMode("edit");
-                              }}
-                              size="icon"
-                              variant="outline"
-                            >
-                              編集
-                            </Button>
-                            <Button
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void deleteCard(card.id);
-                              }}
-                              size="icon"
-                              variant="destructive"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            {card.current_market_price >= HIGH_VALUE_THRESHOLD ? (
+                              <Badge className="mt-2 bg-amber-500 text-white">高額カード</Badge>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>{card.oripa_app?.name ?? "未分類"}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button asChild size="icon" variant="outline">
+                                <Link href={`/cards/${card.id}`}>
+                                  <Eye className="size-4" />
+                                </Link>
+                              </Button>
+                              <Button
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setEditingId(card.id);
+                                  setFormMode("edit");
+                                }}
+                                size="icon"
+                                variant="outline"
+                              >
+                                編集
+                              </Button>
+                              <Button
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void deleteCard(card.id);
+                                }}
+                                size="icon"
+                                variant="destructive"
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

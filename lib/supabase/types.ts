@@ -40,4 +40,14 @@ export interface DashboardMetrics {
     appName: string;
     totalAmount: number;
   }>;
+  profitByApp: Array<{
+    appId: string;
+    appName: string;
+    spendAmount: number;
+    salesNet: number;
+    holdingValue: number;
+    balance: number;
+    holdingCount: number;
+    soldCount: number;
+  }>;
 }

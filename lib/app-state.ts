@@ -67,6 +67,7 @@ const EMPTY_METRICS: DashboardMetrics = {
   totalHoldingValue: 0,
   balance: 0,
   spendByApp: [],
+  profitByApp: [],
 };
 
 export function useOripaAppState(): AppStateResult {
@@ -157,7 +158,14 @@ export function useOripaAppState(): AppStateResult {
       (wrapMutationWithResult(() => createCard(payload)) as unknown as Promise<CardWithRelations | null>),
     updateCard: async (id, payload) => wrapMutation(() => updateCard(id, payload)),
     deleteCard: async (id) => wrapMutation(() => deleteCard(id)),
-    createSale: async (payload) => wrapMutation(() => createSale(payload)),
+    createSale: async (payload) =>
+      wrapMutation(async () => {
+        await createSale(payload);
+        await updateCard(payload.card_id, {
+          status: "sold",
+          sold_at: payload.sold_date,
+        });
+      }),
     deleteSale: async (id) => wrapMutation(() => deleteSale(id)),
     createShopPrice: async (payload) => wrapMutation(() => createShopPrice(payload)),
     deleteShopPrice: async (id) => wrapMutation(() => deleteShopPrice(id)),
