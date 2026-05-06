@@ -70,6 +70,10 @@ const EMPTY_METRICS: DashboardMetrics = {
   profitByApp: [],
 };
 
+function toSoldAtTimestamp(soldDate: string) {
+  return new Date(`${soldDate}T00:00:00.000Z`).toISOString();
+}
+
 export function useOripaAppState(): AppStateResult {
   const [apps, setApps] = useState<OripaApp[]>([]);
   const [spendLogs, setSpendLogs] = useState<SpendLogWithApp[]>([]);
@@ -163,7 +167,7 @@ export function useOripaAppState(): AppStateResult {
         await createSale(payload);
         await updateCard(payload.card_id, {
           status: "sold",
-          sold_at: payload.sold_date,
+          sold_at: toSoldAtTimestamp(payload.sold_date),
         });
       }),
     deleteSale: async (id) => wrapMutation(() => deleteSale(id)),

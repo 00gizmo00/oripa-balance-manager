@@ -64,7 +64,7 @@ export function CardDetailView({ cardId }: { cardId: string }) {
                   onClick={() =>
                     void updateCard(card.id, {
                       status: "sold",
-                      sold_at: new Date().toISOString().slice(0, 10),
+                      sold_at: new Date().toISOString(),
                     })
                   }
                   variant="outline"
