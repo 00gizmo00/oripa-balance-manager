@@ -6,12 +6,12 @@ import { ArrowLeft, RefreshCcw, Trash2 } from "lucide-react";
 import { CardImage } from "@/components/cards/card-image";
 import { SaleForm } from "@/components/forms/sale-form";
 import { ShopPriceForm } from "@/components/forms/shop-price-form";
-import { EmptyState } from "@/components/layout/empty-state";
 import { useAppData } from "@/components/layout/app-data-provider";
+import { EmptyState } from "@/components/layout/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, getDisplayedCardPrice } from "@/lib/utils";
 
 function formatDate(date?: string | null) {
   if (!date) {
@@ -31,6 +31,7 @@ export function CardDetailView({ cardId }: { cardId: string }) {
 
   const sortedSales = [...(card.sales ?? [])].sort((a, b) => b.sold_date.localeCompare(a.sold_date));
   const sortedShopPrices = [...(card.shop_prices ?? [])].sort((a, b) => b.price_date.localeCompare(a.price_date));
+  const displayedPrice = getDisplayedCardPrice(card);
 
   return (
     <div className="space-y-6">
@@ -56,8 +57,12 @@ export function CardDetailView({ cardId }: { cardId: string }) {
               <p className="text-sm text-slate-600">状態 {card.condition || "未入力"} / 枚数 {card.quantity}</p>
               <p className="text-sm text-slate-600">由来アプリ {card.oripa_app?.name ?? "未分類"}</p>
               <p className="text-sm text-slate-600">売却状態にした日 {formatDate(card.sold_at)}</p>
-              <p className="text-lg font-semibold text-slate-900">{formatCurrency(card.current_market_price)} / 枚</p>
-              <p className="text-sm text-slate-600">所持評価額 {formatCurrency(card.current_market_price * card.quantity)}</p>
+              <p className="text-lg font-semibold text-slate-900">
+                {formatCurrency(displayedPrice.value)} / {displayedPrice.label}
+              </p>
+              {card.status === "holding" ? (
+                <p className="text-sm text-slate-600">所持評価額 {formatCurrency(card.current_market_price * card.quantity)}</p>
+              ) : null}
               {card.memo ? <p className="rounded-2xl bg-muted/60 p-3 text-sm text-slate-700">{card.memo}</p> : null}
               {card.status === "holding" ? (
                 <Button

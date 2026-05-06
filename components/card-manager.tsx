@@ -7,8 +7,8 @@ import { Eye, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 
 import { CardImage } from "@/components/cards/card-image";
 import { CardForm } from "@/components/forms/card-form";
-import { EmptyState } from "@/components/layout/empty-state";
 import { useAppData } from "@/components/layout/app-data-provider";
+import { EmptyState } from "@/components/layout/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, getDisplayedCardPrice } from "@/lib/utils";
 
 type FormMode = "create" | "edit" | null;
 
@@ -29,30 +29,14 @@ function getRarityBadgeClass(rarity?: string | null) {
 
   const normalized = rarity.toUpperCase();
 
-  if (normalized.includes("SAR")) {
-    return "border border-fuchsia-200 bg-fuchsia-100 text-fuchsia-900";
-  }
-  if (normalized.includes("UR")) {
-    return "border border-amber-200 bg-amber-100 text-amber-900";
-  }
-  if (normalized.includes("AR")) {
-    return "border border-sky-200 bg-sky-100 text-sky-900";
-  }
-  if (normalized.includes("SR")) {
-    return "border border-violet-200 bg-violet-100 text-violet-900";
-  }
-  if (normalized.includes("CHR") || normalized.includes("CSR")) {
-    return "border border-rose-200 bg-rose-100 text-rose-900";
-  }
-  if (normalized.includes("RRR")) {
-    return "border border-orange-200 bg-orange-100 text-orange-900";
-  }
-  if (normalized.includes("RR")) {
-    return "border border-emerald-200 bg-emerald-100 text-emerald-900";
-  }
-  if (normalized.includes("R")) {
-    return "border border-blue-200 bg-blue-100 text-blue-900";
-  }
+  if (normalized.includes("SAR")) return "border border-fuchsia-200 bg-fuchsia-100 text-fuchsia-900";
+  if (normalized.includes("UR")) return "border border-amber-200 bg-amber-100 text-amber-900";
+  if (normalized.includes("AR")) return "border border-sky-200 bg-sky-100 text-sky-900";
+  if (normalized.includes("SR")) return "border border-violet-200 bg-violet-100 text-violet-900";
+  if (normalized.includes("CHR") || normalized.includes("CSR")) return "border border-rose-200 bg-rose-100 text-rose-900";
+  if (normalized.includes("RRR")) return "border border-orange-200 bg-orange-100 text-orange-900";
+  if (normalized.includes("RR")) return "border border-emerald-200 bg-emerald-100 text-emerald-900";
+  if (normalized.includes("R")) return "border border-blue-200 bg-blue-100 text-blue-900";
 
   return "border border-slate-300 bg-slate-200 text-slate-700";
 }
@@ -82,7 +66,7 @@ export function CardManager() {
         [card.name, card.rarity, card.model_number, card.condition, card.oripa_app?.name].some((value) =>
           value?.toLowerCase().includes(query.toLowerCase()),
         );
-      const matchesStatus = statusFilter === "all" ? true : card.status === statusFilter;
+      const matchesStatus = statusFilter === "all" || card.status === statusFilter;
 
       return matchesQuery && matchesStatus;
     });
@@ -109,7 +93,7 @@ export function CardManager() {
               <div>
                 <h3 className="text-2xl font-bold tracking-tight text-slate-900">カードコレクション</h3>
                 <p className="mt-2 text-sm text-slate-600">
-                  一覧を先に眺められるようにしつつ、検索・状態フィルター・追加・編集をここからまとめて扱えます。
+                  一覧を眺めやすくしつつ、検索、状態フィルター、追加、編集までここから扱えます。
                 </p>
               </div>
             </div>
@@ -187,7 +171,7 @@ export function CardManager() {
                   ...cardPayload,
                   sold_at:
                     cardPayload.status === "sold"
-                      ? editingCard?.sold_at ?? new Date().toISOString().slice(0, 10)
+                      ? editingCard?.sold_at ?? new Date().toISOString()
                       : null,
                 };
 
@@ -229,6 +213,7 @@ export function CardManager() {
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:hidden">
             {filteredCards.map((card) => {
               const soldAt = formatShortDate(card.sold_at);
+              const displayedPrice = getDisplayedCardPrice(card);
 
               return (
                 <article
@@ -239,7 +224,7 @@ export function CardManager() {
                     card.status === "holding"
                       ? "border-emerald-200 bg-white"
                       : "border-slate-200 bg-slate-100/90 opacity-70 saturate-[0.75]",
-                    card.current_market_price >= HIGH_VALUE_THRESHOLD
+                    displayedPrice.value >= HIGH_VALUE_THRESHOLD
                       ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-background"
                       : "",
                   )}
@@ -277,16 +262,18 @@ export function CardManager() {
                       <div
                         className={cn(
                           "rounded-2xl px-3 py-2",
-                          card.current_market_price >= HIGH_VALUE_THRESHOLD ? "bg-amber-100 text-amber-950" : "bg-muted/60",
+                          displayedPrice.value >= HIGH_VALUE_THRESHOLD ? "bg-amber-100 text-amber-950" : "bg-muted/60",
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">現在相場</p>
-                          {card.current_market_price >= HIGH_VALUE_THRESHOLD ? (
+                          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+                            {displayedPrice.label}
+                          </p>
+                          {displayedPrice.value >= HIGH_VALUE_THRESHOLD ? (
                             <Badge className="bg-amber-500 text-white">高額</Badge>
                           ) : null}
                         </div>
-                        <p className="mt-1 text-base font-bold text-slate-900">{formatCurrency(card.current_market_price)}</p>
+                        <p className="mt-1 text-base font-bold text-slate-900">{formatCurrency(displayedPrice.value)}</p>
                       </div>
                       <div className="flex items-center justify-between text-xs text-slate-600">
                         <span>枚数 {card.quantity}</span>
@@ -341,7 +328,7 @@ export function CardManager() {
                       <TableHead>カード情報</TableHead>
                       <TableHead>状態</TableHead>
                       <TableHead>枚数</TableHead>
-                      <TableHead>現在相場</TableHead>
+                      <TableHead>表示価格</TableHead>
                       <TableHead>アプリ</TableHead>
                       <TableHead className="w-36">操作</TableHead>
                     </TableRow>
@@ -349,6 +336,7 @@ export function CardManager() {
                   <TableBody>
                     {filteredCards.map((card) => {
                       const soldAt = formatShortDate(card.sold_at);
+                      const displayedPrice = getDisplayedCardPrice(card);
 
                       return (
                         <TableRow
@@ -356,7 +344,7 @@ export function CardManager() {
                           className={cn(
                             "cursor-pointer",
                             card.status === "sold" ? "bg-slate-50/80 text-slate-500" : "",
-                            card.current_market_price >= HIGH_VALUE_THRESHOLD ? "bg-amber-50/60" : "",
+                            displayedPrice.value >= HIGH_VALUE_THRESHOLD ? "bg-amber-50/60" : "",
                           )}
                           onClick={() => router.push(`/cards/${card.id}`)}
                         >
@@ -387,10 +375,10 @@ export function CardManager() {
                           <TableCell>{card.quantity}</TableCell>
                           <TableCell>
                             <div>
-                              <p className="font-semibold text-slate-900">{formatCurrency(card.current_market_price)}</p>
-                              <p className="text-xs text-slate-500">1枚あたり</p>
+                              <p className="font-semibold text-slate-900">{formatCurrency(displayedPrice.value)}</p>
+                              <p className="text-xs text-slate-500">{displayedPrice.label}</p>
                             </div>
-                            {card.current_market_price >= HIGH_VALUE_THRESHOLD ? (
+                            {displayedPrice.value >= HIGH_VALUE_THRESHOLD ? (
                               <Badge className="mt-2 bg-amber-500 text-white">高額カード</Badge>
                             ) : null}
                           </TableCell>
